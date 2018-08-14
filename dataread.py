@@ -2,7 +2,7 @@ import random, os, cv2
 import numpy as np
 
 #TRAIN_DIR = ['./result/', './result-crop/', './result-flip/']
-TRAIN_DIR = ['./test/']
+TRAIN_DIR = ['./all_result/result/']
 # TEST_DIR = './input/test/'
 ROWS = 64 * 4
 COLS = 64 * 4
@@ -43,18 +43,18 @@ def prep_data(images):
     return data
 
 # 根据文件名生成label
-def get_labels(image_name):
+def get_labels(image_path):
     labels = []
-    list = []
-    for name in image_name:
-        if name[len(TRAIN_DIR)] == '1':
+    for path in image_path:
+        filename = os.path.split(path)[1]
+        if filename[0] == '1':
             labels.append([[[1, 0]]])
-            list.append(0)
-        else:
+        elif filename[0] == '2':
             labels.append([[[0, 1]]])
-            list.append(1)
-    
-    print(len(list))
+        else:
+            print('label set failed')
+            exit()
+
     return labels
 
 if __name__=="__main__":
