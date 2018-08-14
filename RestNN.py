@@ -266,7 +266,7 @@ def resnet_v2(inputs,
             net = slim.batch_norm(net, activation_fn=tf.nn.relu, scope='postnorm')
             if global_pool:
                 # Global average pooling.
-                net = tf.reduce_mean(net, [1, 2], name='pool5', keepdims=True)
+                net = tf.reduce_mean(net, [1, 2], name='pool5', keep_dims=True)
             if num_classes is not None:
                 net = slim.conv2d(net, num_classes, [1, 1], activation_fn=None,
                                   normalizer_fn=None, scope='logits')
@@ -374,7 +374,7 @@ def get_next_batch(batch_size=64):
 
 
 # 训练
-max_acc = 0.5 #保存model精度要求
+max_acc = 0.7 #保存model精度要求
 train, validation, train_labels, validation_labels = dr.read()
 
 def train_crack_captcha_cnn(is_train, checkpoint_dir):
@@ -405,11 +405,11 @@ def train_crack_captcha_cnn(is_train, checkpoint_dir):
     tf.summary.scalar("learning_rate", learning_rate)
 
     saver = tf.train.Saver()
-    with tf.Session(config=tf.ConfigProto(log_device_placement=True, allow_soft_placement = True)) as sess:
+    with tf.Session(config=tf.ConfigProto(allow_soft_placement = True)) as sess:
         if is_train:
             writer = tf.summary.FileWriter("/tmp/cnn_log/log", graph = sess.graph)
             sess.run(tf.global_variables_initializer())
-            while step < 20000:
+            while step < 100000:
                 merged = tf.summary.merge_all()
                 batch_x, batch_y = get_next_batch()
 
@@ -418,14 +418,14 @@ def train_crack_captcha_cnn(is_train, checkpoint_dir):
                 print('step : {} loss : {}'.format(step, _loss))
 
                 # 每100 step计算一次准确率
-                if step % 2 == 0:
+                if step % 15 == 0:
                     acc = sess.run(accuracy, feed_dict={X: validation, Y: validation_labels})
                     print('accuracy : {}'.format(acc))
 
                     # 如果准确率大于max_acc,保存模型,完成训练
                     if acc > max_acc:
-                        max_acc = acc
-                        saver.save(sess, checkpoint_dir + "/model.ckpt", global_step=step)
+                        max_acc = float(acc) #转换类型防止变为同一个引用
+                        saver.save(sess, checkpoint_dir + "/" + str(step) + "/model.ckpt", global_step=step)
 
                         ##### predict #####
                         # predict_y = sess.run(output, feed_dict={X: test})
@@ -447,4 +447,4 @@ def train_crack_captcha_cnn(is_train, checkpoint_dir):
                 acc = sess.run(accuracy, feed_dict={X: validation, Y: validation_labels})
                 print('accuracy : {}'.format(acc))
 
-train_crack_captcha_cnn(False, 'checkpoint')
+train_crack_captcha_cnn(True, 'check')
