@@ -40,9 +40,28 @@ def flip(filename, result_dir):
     cv2.imwrite(result_dir + os.path.splitext(filename)[0] + '_' + 'l_r_u-d.jpg',
                 l_r_u_d_img)
 
+def changehue(filename, result_dir):
+    img = cv2.imread(os.path.join(read_dir, filename))
+    adjusted1 = tf.image.adjust_hue(img, 0.2)
+    adjusted2 = tf.image.adjust_hue(img, 0.6)
+    # 将图片的饱和度-5。
+    adjusted3 = tf.image.adjust_saturation(img, -5)
+    # 将图片的饱和度+5。
+    adjusted4 = tf.image.adjust_saturation(img, 5)
+
+    cv2.imwrite(result_dir + os.path.splitext(filename)[0] + '_' + 'a1.jpg',
+                adjusted1.eval())
+    cv2.imwrite(result_dir + os.path.splitext(filename)[0] + '_' + 'a2.jpg',
+                adjusted2.eval())
+    cv2.imwrite(result_dir + os.path.splitext(filename)[0] + '_' + 'a3.jpg',
+                adjusted3.eval())
+    cv2.imwrite(result_dir + os.path.splitext(filename)[0] + '_' + 'a4.jpg',
+                adjusted4.eval())
+
+
 NUM = 3
 if __name__ == "__main__":
-    result_dir = 'all_result/result-flip/'
+    result_dir = 'all_result/result-hua/'
     if not os.path.exists(result_dir):
         os.mkdir(result_dir)
 
@@ -54,6 +73,6 @@ if __name__ == "__main__":
 
     with tf.Session() as sess:
         for filename in os.listdir(read_dir):
-            flip(filename, result_dir)
+            changehue(filename, result_dir)
             print(filename + ' -------OK!!!')
     sess.close()
