@@ -354,7 +354,7 @@ def resnet_v2_200(inputs,
 
 # 生成一个训练batch
 batch_i = 0
-def get_next_batch(batch_size=64):
+def get_next_batch(batch_size=1):
     global batch_i
 
     if (batch_i + 1) * batch_size > len(train):
@@ -374,7 +374,7 @@ def get_next_batch(batch_size=64):
 
 
 # 训练
-max_acc = 0.7 #保存model精度要求
+max_acc = 0.75 #保存model精度要求
 train, validation, train_labels, validation_labels = dr.read()
 
 def train_crack_captcha_cnn(is_train, checkpoint_dir):
@@ -383,15 +383,15 @@ def train_crack_captcha_cnn(is_train, checkpoint_dir):
     Y = tf.placeholder(tf.float32, [None, 1, 1, 2])
     output, end_points = resnet_v2_50(X, num_classes = 2)
 
-    step = 1
-    learning_rate = tf.train.exponential_decay(0.001, step, 100, 0.8)
+    global_steps = tf.Variable(1, trainable=False)
+    learning_rate = tf.train.exponential_decay(0.001, global_steps, 100, 0.9)
 
     with tf.device('/device:GPU:0'):
         # loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(output, Y))
         loss = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(labels=Y, logits=output))
         # 最后一层用来分类的softmax和sigmoid有什么不同？
         # optimizer 为了加快训练 learning_rate应该开始大，然后慢慢衰
-        optimizer = tf.train.AdamOptimizer(learning_rate=learning_rate).minimize(loss)
+        optimizer = tf.train.AdamOptimizer(learning_rate=learning_rate).minimize(loss, global_step=global_steps)
 
     predict = tf.argmax(output, axis = 3)
     l = tf.argmax(Y, axis = 3)
@@ -400,7 +400,6 @@ def train_crack_captcha_cnn(is_train, checkpoint_dir):
     accuracy = tf.reduce_mean(tf.cast(correct_pred, tf.float32))
 
     ## tensorboard
-    tf.summary.scalar('accuracy', accuracy)
     tf.summary.scalar("loss", loss)
     tf.summary.scalar("learning_rate", learning_rate)
 
@@ -409,23 +408,26 @@ def train_crack_captcha_cnn(is_train, checkpoint_dir):
         if is_train:
             writer = tf.summary.FileWriter("/tmp/cnn_log/log", graph = sess.graph)
             sess.run(tf.global_variables_initializer())
-            while step < 100000:
+            step_value = sess.run(global_steps)
+            while step_value < 100000:
+                step_value = sess.run(global_steps)
                 merged = tf.summary.merge_all()
                 batch_x, batch_y = get_next_batch()
 
                 result, _, _loss= sess.run([merged, optimizer, loss], feed_dict={X: batch_x, Y: batch_y})
-                writer.add_summary(result, step)
-                print('step : {} loss : {}'.format(step, _loss))
+                writer.add_summary(result, step_value)
+                print('step : {} loss : {}'.format(step_value, _loss))
 
                 # 每100 step计算一次准确率
-                if step % 15 == 0:
+                if step_value % 20 == 0:
                     acc = sess.run(accuracy, feed_dict={X: validation, Y: validation_labels})
+                    tf.summary.scalar('test_accuracy', acc)
                     print('accuracy : {}'.format(acc))
 
                     # 如果准确率大于max_acc,保存模型,完成训练
                     if acc > max_acc:
                         max_acc = float(acc) #转换类型防止变为同一个引用
-                        saver.save(sess, checkpoint_dir + "/" + str(step) + "/model.ckpt", global_step=step)
+                        saver.save(sess, checkpoint_dir + "/" + str(step_value) + '-' + str(acc) + "/model.ckpt", global_step=global_steps)
 
                         ##### predict #####
                         # predict_y = sess.run(output, feed_dict={X: test})
@@ -437,8 +439,6 @@ def train_crack_captcha_cnn(is_train, checkpoint_dir):
                         # data['label'] = predict_y
                         # data.to_csv("gender_submission.csv" + str(step), index=False)
                         ##### end #####
-
-                step += 1
             writer.close()
         else:
             ckpt = tf.train.get_checkpoint_state(checkpoint_dir)
