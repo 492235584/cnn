@@ -266,7 +266,10 @@ def resnet_v2(inputs,
             net = slim.batch_norm(net, activation_fn=tf.nn.relu, scope='postnorm')
             if global_pool:
                 # Global average pooling.
+                print('------')
+                print(net.shape)
                 net = tf.reduce_mean(net, [1, 2], name='pool5', keep_dims=True)
+                print(net.shape)
             if num_classes is not None:
                 net = slim.conv2d(net, num_classes, [1, 1], activation_fn=None,
                                   normalizer_fn=None, scope='logits')
@@ -275,6 +278,23 @@ def resnet_v2(inputs,
             if num_classes is not None:
                 end_points['predictions'] = slim.softmax(net, scope='predictions')
             return net, end_points
+
+def resnet_v2_my(inputs,
+                 num_classes=None,
+                 global_pool=True,
+                 reuse=None,
+                 scope='resnet_v2_50'):
+    """ResNet-50 model of [1]. See resnet_v2() for arg and return description."""
+    blocks = [
+        Block('block1', bottleneck, [(256, 64, 1)] * 1 + [(256, 64, 2)]),
+        Block(
+            'block2', bottleneck, [(512, 128, 1)] * 2 + [(512, 128, 2)]),
+        Block(
+            'block3', bottleneck, [(1024, 256, 1)] * 2 + [(1024, 256, 2)]),
+        Block(
+            'block4', bottleneck, [(2048, 512, 1)] * 1)]
+    return resnet_v2(inputs, blocks, num_classes, global_pool,
+                     include_root_block=True, reuse=reuse, scope=scope)
 
 
 def resnet_v2_50(inputs,
@@ -381,25 +401,23 @@ def train_crack_captcha_cnn(is_train, checkpoint_dir):
     global max_acc
     X = tf.placeholder(tf.float32, [None, dr.ROWS, dr.COLS, dr.CHANNELS])
     Y = tf.placeholder(tf.float32, [None, 1, 1, 2])
-    output, end_points = resnet_v2_50(X, num_classes = 2)
+    output, end_points = resnet_v2_my(X, num_classes = 2)
 
     global_steps = tf.Variable(1, trainable=False)
     learning_rate = tf.train.exponential_decay(0.001, global_steps, 100, 0.9)
 
     with tf.device('/device:GPU:0'):
-        # loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(output, Y))
         loss = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(labels=Y, logits=output))
-        # 最后一层用来分类的softmax和sigmoid有什么不同？
         # optimizer 为了加快训练 learning_rate应该开始大，然后慢慢衰
         optimizer = tf.train.AdamOptimizer(learning_rate=learning_rate).minimize(loss, global_step=global_steps)
 
     predict = tf.argmax(output, axis = 3)
     l = tf.argmax(Y, axis = 3)
-
     correct_pred = tf.equal(predict, l)
     accuracy = tf.reduce_mean(tf.cast(correct_pred, tf.float32))
 
     ## tensorboard
+    tf.summary.scalar('test_accuracy', accuracy)
     tf.summary.scalar("loss", loss)
     tf.summary.scalar("learning_rate", learning_rate)
 
@@ -421,7 +439,6 @@ def train_crack_captcha_cnn(is_train, checkpoint_dir):
                 # 每100 step计算一次准确率
                 if step_value % 20 == 0:
                     acc = sess.run(accuracy, feed_dict={X: validation, Y: validation_labels})
-                    tf.summary.scalar('test_accuracy', acc)
                     print('accuracy : {}'.format(acc))
 
                     # 如果准确率大于max_acc,保存模型,完成训练
