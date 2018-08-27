@@ -6,36 +6,31 @@ import matplotlib.pyplot as plt
 read_dir = 'all_result/result/'
 
 # 随机剪切
-def randomcrop(filename, result_dir, suffix):
-    img = cv2.imread(os.path.join(read_dir, filename))
-    # 将图片进行随机裁剪为280×280
-    crop_img = tf.random_crop(img, [192, 192, 3])
+def randomcrop(filename, result_dir, suffix, crop):
+    image = cv2.imread(os.path.join(read_dir, filename))
     # 将图片由BGR转成RGB
-    crop_img = crop_img.eval()
+    crop_img = crop.eval(feed_dict = {img : image})
     # 保存裁剪后的图片
     cv2.imwrite(result_dir + os.path.splitext(filename)[0] + '_' + str(suffix) + '.jpg',
 	        crop_img)
 
 # 图片翻转，上下，左右，对角
-def flip(filename, result_dir):
-    img = cv2.imread(os.path.join(read_dir, filename))
+def flip(filename, result_dir, lr_op, ud_op, lrud_op):
+    image = cv2.imread(os.path.join(read_dir, filename))
     # 将图片进行左右翻转
-    l_r_img = tf.image.flip_left_right(img)
-    l_r_img = l_r_img.eval()
+    l_r_img = lr_op.eval(feed_dict = {img : image})
     # 保存左右翻转后的图片
     cv2.imwrite(result_dir + os.path.splitext(filename)[0] + '_' + '_l-r.jpg',
 	        l_r_img)
 
     # 将图片进行上下翻转
-    u_d_img = tf.image.flip_up_down(img)
-    u_d_img = u_d_img.eval()
+    u_d_img = ud_op.eval(feed_dict = {img : image})
     # 保存上下翻转后的图片
     cv2.imwrite(result_dir + os.path.splitext(filename)[0] + '_' + '_u-d.jpg',
                 u_d_img)
 
     # 将图片进行先左右再上下翻转
-    l_r_u_d_img = tf.image.flip_up_down(l_r_img)
-    l_r_u_d_img = l_r_u_d_img.eval()
+    l_r_u_d_img = lrud_op.eval(feed_dict = {img : image})
     # 保存上下翻转后的图片
     cv2.imwrite(result_dir + os.path.splitext(filename)[0] + '_' + 'l_r_u-d.jpg',
                 l_r_u_d_img)
@@ -61,18 +56,29 @@ def changehue(filename, result_dir):
 
 NUM = 3
 if __name__ == "__main__":
-    result_dir = 'all_result/result-hua/'
-    if not os.path.exists(result_dir):
-        os.mkdir(result_dir)
+    result_dir1 = 'all_result/result-crop/'
+    result_dir2 = 'all_result/result-flip/'
+    if not os.path.exists(result_dir1):
+        os.mkdir(result_dir1)
+    if not os.path.exists(result_dir2):
+        os.mkdir(result_dir2)
 
-    # with tf.Session() as sess:
-    #     for filename in os.listdir(read_dir):
-    #         for suffix in range(1,NUM + 1):
-    #             randomcrop(filename, result_dir, suffix)
-    #             print(filename + ' -------OK!!!')
+    img = tf.placeholder(tf.float32, [256, 256, 3])
+    crop = tf.random_crop(img, [192, 192, 3])
+
+    lr_op = tf.image.flip_left_right(img)
+    ud_op = tf.image.flip_up_down(img)
+    lrud_op = tf.image.transpose_image(img)
 
     with tf.Session() as sess:
         for filename in os.listdir(read_dir):
-            changehue(filename, result_dir)
-            print(filename + ' -------OK!!!')
+            for suffix in range(1,NUM + 1):
+                randomcrop(filename, result_dir1, suffix, crop)
+                flip(filename, result_dir2, lr_op, ud_op, lrud_op)
+                print(filename + ' -------OK!!!')
+
+    # with tf.Session() as sess:
+    #     for filename in os.listdir(read_dir):
+    #         changehue(filename, result_dir)
+    #         print(filename + ' -------OK!!!')
     sess.close()
