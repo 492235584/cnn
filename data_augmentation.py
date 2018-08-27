@@ -2,9 +2,6 @@ import tensorflow as tf
 import cv2,os
 import matplotlib.pyplot as plt
 
-
-read_dir = 'all_result/result/'
-
 # 随机剪切
 def randomcrop(filename, result_dir, suffix, crop):
     image = cv2.imread(os.path.join(read_dir, filename))
@@ -56,8 +53,9 @@ def changehue(filename, result_dir):
 
 NUM = 3
 if __name__ == "__main__":
-    result_dir1 = 'all_result/result-crop/'
-    result_dir2 = 'all_result/result-flip/'
+    read_dir = './data/new/result/result-nx/'
+    result_dir1 = './data/new/result/augment-nx/'
+    result_dir2 = './data/new/result/augment-nx/'
     if not os.path.exists(result_dir1):
         os.mkdir(result_dir1)
     if not os.path.exists(result_dir2):
