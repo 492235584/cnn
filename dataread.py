@@ -7,7 +7,7 @@ ROWS = 64 * 4
 COLS = 64 * 4
 CHANNELS = 3
 
-def read():
+def read(keepdims = True):
     TRAIN_DIR = []
     for dir in os.listdir(TRAIN_ROOT):
         TRAIN_DIR.append(os.path.join(TRAIN_ROOT, dir))
@@ -35,8 +35,8 @@ def read():
 #    validation_img = all_image[train_num:]
 #    train = prep_data(train_img)
 #    validation = prep_data(validation_img)
-    train_labels = get_labels(train_image)
-    validation_labels = get_labels(test_image)
+    train_labels = get_labels(train_image, keepdims)
+    validation_labels = get_labels(test_image, keepdims)
 
     return (train,validation,train_labels,validation_labels)
 
@@ -57,19 +57,35 @@ def prep_data(images):
     return data
 
 # 根据文件名生成label
-def get_labels(image_path):
+def get_labels(image_path, keepdims = True):
     labels = []
     for path in image_path:
         filename = os.path.split(path)[1]
         if filename[0] == '1':
-            labels.append([[[1, 0]]])
+            if keepdims:
+                labels.append([[[1, 0]]])
+            else:
+                labels.append([1, 0])
         elif filename[0] == '2':
-            labels.append([[[0, 1]]])
+            if keepdims:
+                labels.append([[[0, 1]]])
+            else:
+                labels.append([0, 1])
         else:
             print('label set failed')
             exit()
 
     return labels
 
-if __name__=="__main__":
-    read()
+def color_preprocessing(x_train, x_test):
+    x_train = x_train.astype('float32')
+    x_test = x_test.astype('float32')
+    x_train[:, :, :, 0] = (x_train[:, :, :, 0] - np.mean(x_train[:, :, :, 0])) / np.std(x_train[:, :, :, 0])
+    x_train[:, :, :, 1] = (x_train[:, :, :, 1] - np.mean(x_train[:, :, :, 1])) / np.std(x_train[:, :, :, 1])
+    x_train[:, :, :, 2] = (x_train[:, :, :, 2] - np.mean(x_train[:, :, :, 2])) / np.std(x_train[:, :, :, 2])
+
+    x_test[:, :, :, 0] = (x_test[:, :, :, 0] - np.mean(x_test[:, :, :, 0])) / np.std(x_test[:, :, :, 0])
+    x_test[:, :, :, 1] = (x_test[:, :, :, 1] - np.mean(x_test[:, :, :, 1])) / np.std(x_test[:, :, :, 1])
+    x_test[:, :, :, 2] = (x_test[:, :, :, 2] - np.mean(x_test[:, :, :, 2])) / np.std(x_test[:, :, :, 2])
+
+    return x_train, x_test
