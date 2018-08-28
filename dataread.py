@@ -1,8 +1,8 @@
 import random, os, cv2
 import numpy as np
 
-TRAIN_ROOT = './data/new/train'
-TEST_ROOT = './data/new/test'
+TRAIN_ROOT = './all_result'
+TEST_ROOT = './test'
 ROWS = 64 * 4
 COLS = 64 * 4
 CHANNELS = 3
@@ -10,18 +10,22 @@ CHANNELS = 3
 def read(keepdims = True):
     TRAIN_DIR = []
     for dir in os.listdir(TRAIN_ROOT):
+        if dir.startswith('.'):
+            continue
         TRAIN_DIR.append(os.path.join(TRAIN_ROOT, dir))
     TEST_DIR = []
     for dir in os.listdir(TEST_ROOT):
+        if dir.startswith('.'):
+            continue
         TEST_DIR.append(os.path.join(TEST_ROOT, dir))
 
     train_image = []
     for im_dir in TRAIN_DIR:
-        train_image += [os.path.join(im_dir, filename) for filename in os.listdir(im_dir)]
+        train_image += [os.path.join(im_dir, filename) for filename in os.listdir(im_dir) if not filename.startswith('.')]
 
     test_image = []
     for im_dir in TEST_DIR:
-        test_image += [os.path.join(im_dir, filename) for filename in os.listdir(im_dir)]
+        test_image += [os.path.join(im_dir, filename) for filename in os.listdir(im_dir) if not filename.startswith('.')]
 
     # slice datasets for memory efficiency on Kaggle Kernels, delete if using full dataset
     random.shuffle(train_image)

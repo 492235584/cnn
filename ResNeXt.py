@@ -23,12 +23,9 @@ thus, total number of layers = (3*blocks)*residual_layer_num + 2
 depth = 64 # out channel
 
 batch_size = 64
-iteration = 391
 # 128 * 391 ~ 50,000
 
-test_iteration = 10
-
-total_epochs = 300
+total_epochs = 3000
 
 def conv_layer(input, filter, kernel, stride, padding='SAME', layer_name="conv"):
     with tf.name_scope(layer_name):
@@ -63,31 +60,40 @@ def Linear(x) :
     return tf.layers.dense(inputs=x, use_bias=False, units=class_num, name='linear')
 
 def Evaluate(sess):
-    test_acc = 0.0
-    test_loss = 0.0
+    test_batch_x = test_x
+    test_batch_y = test_y
 
-    for it in range(test_iteration):
-        test_batch_x = test_x
-        test_batch_y = test_y
+    test_feed_dict = {
+        x: test_batch_x,
+        label: test_batch_y,
+        training_flag: False
+    }
 
-        test_feed_dict = {
-            x: test_batch_x,
-            label: test_batch_y,
-            training_flag: False
-        }
+    loss_, acc_ = sess.run([cost, accuracy], feed_dict=test_feed_dict)
 
-        loss_, acc_ = sess.run([cost, accuracy], feed_dict=test_feed_dict)
-
-        test_loss += loss_
-        test_acc += acc_
-
-    test_loss /= test_iteration # average loss
-    test_acc /= test_iteration # average accuracy
-
+    test_loss = loss_
+    test_acc = acc_
     summary = tf.Summary(value=[tf.Summary.Value(tag='test_loss', simple_value=test_loss),
                                 tf.Summary.Value(tag='test_accuracy', simple_value=test_acc)])
 
     return test_acc, test_loss, summary
+
+# 生成一个训练batch
+batch_i = 0
+def get_next_batch(batch_size=64):
+    global batch_i
+
+    if (batch_i + 1) * batch_size > len(train_x):
+        end = len(train_x)
+        batch_i = -1
+    else:
+        end = (batch_i + 1) * batch_size
+    batch_x = train_x[batch_i * batch_size : end]
+    batch_y = train_y[batch_i * batch_size: end]
+
+    batch_i = batch_i + 1
+
+    return batch_x, batch_y
 
 class ResNeXt():
     def __init__(self, x, training):
@@ -155,7 +161,7 @@ class ResNeXt():
 
             input_x = Relu(x + pad_input_x)
 
-        return input_x 
+        return input_x
 
 
     def Build_ResNext(self, input_x):
@@ -175,56 +181,47 @@ class ResNeXt():
         return x
 
 
-train_x, test_x, train_y, test_y = dataread.read(False)
-train_x, test_x = dataread.color_preprocessing(train_x, test_x)
+if __name__ == '__main__':
+    train_x, test_x, train_y, test_y = dataread.read(False)
+    train_x, test_x = dataread.color_preprocessing(train_x, test_x)
 
 
-# image_size = 32, img_channels = 3, class_num = 10 in cifar10
-x = tf.placeholder(tf.float32, shape=[None, dataread.ROWS, dataread.COLS, dataread.CHANNELS])
-label = tf.placeholder(tf.float32, shape=[None, class_num])
+    # image_size = 32, img_channels = 3, class_num = 10 in cifar10
+    x = tf.placeholder(tf.float32, shape=[None, dataread.ROWS, dataread.COLS, dataread.CHANNELS])
+    label = tf.placeholder(tf.float32, shape=[None, class_num])
 
-training_flag = tf.placeholder(tf.bool)
+    training_flag = tf.placeholder(tf.bool)
 
 
-learning_rate = tf.placeholder(tf.float32, name='learning_rate')
+    learning_rate = tf.placeholder(tf.float32, name='learning_rate')
 
-logits = ResNeXt(x, training=training_flag).model
-cost = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels=label, logits=logits))
+    logits = ResNeXt(x, training=training_flag).model
+    cost = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels=label, logits=logits))
 
-l2_loss = tf.add_n([tf.nn.l2_loss(var) for var in tf.trainable_variables()])
-optimizer = tf.train.MomentumOptimizer(learning_rate=learning_rate, momentum=momentum, use_nesterov=True)
-train = optimizer.minimize(cost + l2_loss * weight_decay)
+    l2_loss = tf.add_n([tf.nn.l2_loss(var) for var in tf.trainable_variables()])
+    optimizer = tf.train.MomentumOptimizer(learning_rate=learning_rate, momentum=momentum, use_nesterov=True)
+    train = optimizer.minimize(cost + l2_loss * weight_decay)
 
-correct_prediction = tf.equal(tf.argmax(logits, 1), tf.argmax(label, 1))
-accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
+    correct_prediction = tf.equal(tf.argmax(logits, 1), tf.argmax(label, 1))
+    accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
 
-saver = tf.train.Saver(tf.global_variables())
+    saver = tf.train.Saver(tf.global_variables())
 
-with tf.Session() as sess:
-    ckpt = tf.train.get_checkpoint_state('./model')
-    if ckpt and tf.train.checkpoint_exists(ckpt.model_checkpoint_path):
-        saver.restore(sess, ckpt.model_checkpoint_path)
-    else:
-        sess.run(tf.global_variables_initializer())
+    with tf.Session() as sess:
+        ckpt = tf.train.get_checkpoint_state('./model')
+        if ckpt and tf.train.checkpoint_exists(ckpt.model_checkpoint_path):
+            saver.restore(sess, ckpt.model_checkpoint_path)
+        else:
+            sess.run(tf.global_variables_initializer())
 
-    summary_writer = tf.summary.FileWriter('./logs', sess.graph)
+        summary_writer = tf.summary.FileWriter('./logs', sess.graph)
 
-    epoch_learning_rate = init_learning_rate
-    for epoch in range(1, total_epochs + 1):
-        if epoch == (total_epochs * 0.5) or epoch == (total_epochs * 0.75):
-            epoch_learning_rate = epoch_learning_rate / 10
+        epoch_learning_rate = init_learning_rate
+        for epoch in range(1, total_epochs + 1):
+            if epoch == (total_epochs * 0.5) or epoch == (total_epochs * 0.75):
+                epoch_learning_rate = epoch_learning_rate / 10
 
-        pre_index = 0
-        train_acc = 0.0
-        train_loss = 0.0
-
-        for step in range(1, iteration + 1):
-            if pre_index + batch_size < 50000:
-                batch_x = train_x[pre_index: pre_index + batch_size]
-                batch_y = train_y[pre_index: pre_index + batch_size]
-            else:
-                batch_x = train_x[pre_index:]
-                batch_y = train_y[pre_index:]
+            batch_x, batch_y = get_next_batch(batch_size)
 
             train_feed_dict = {
                 x: batch_x,
@@ -236,28 +233,23 @@ with tf.Session() as sess:
             _, batch_loss = sess.run([train, cost], feed_dict=train_feed_dict)
             batch_acc = accuracy.eval(feed_dict=train_feed_dict)
 
-            train_loss += batch_loss
-            train_acc += batch_acc
-            pre_index += batch_size
+            train_loss = batch_loss
+            train_acc = batch_acc
 
+            train_summary = tf.Summary(value=[tf.Summary.Value(tag='train_loss', simple_value=train_loss),
+                                              tf.Summary.Value(tag='train_accuracy', simple_value=train_acc)])
 
-        train_loss /= iteration # average loss
-        train_acc /= iteration # average accuracy
+            test_acc, test_loss, test_summary = Evaluate(sess)
 
-        train_summary = tf.Summary(value=[tf.Summary.Value(tag='train_loss', simple_value=train_loss),
-                                          tf.Summary.Value(tag='train_accuracy', simple_value=train_acc)])
+            summary_writer.add_summary(summary=train_summary, global_step=epoch)
+            summary_writer.add_summary(summary=test_summary, global_step=epoch)
+            summary_writer.flush()
 
-        test_acc, test_loss, test_summary = Evaluate(sess)
+            line = "epoch: %d/%d, train_loss: %.4f, train_acc: %.4f, test_loss: %.4f, test_acc: %.4f \n" % (
+                epoch, total_epochs, train_loss, train_acc, test_loss, test_acc)
+            print(line)
 
-        summary_writer.add_summary(summary=train_summary, global_step=epoch)
-        summary_writer.add_summary(summary=test_summary, global_step=epoch)
-        summary_writer.flush()
+            with open('logs.txt', 'a') as f:
+                f.write(line)
 
-        line = "epoch: %d/%d, train_loss: %.4f, train_acc: %.4f, test_loss: %.4f, test_acc: %.4f \n" % (
-            epoch, total_epochs, train_loss, train_acc, test_loss, test_acc)
-        print(line)
-
-        with open('logs.txt', 'a') as f:
-            f.write(line)
-
-        saver.save(sess=sess, save_path='./model/ResNeXt.ckpt')
+            saver.save(sess=sess, save_path='./model/ResNeXt.ckpt')
