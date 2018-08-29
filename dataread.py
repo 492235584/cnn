@@ -79,7 +79,7 @@ def get_labels(image_path, keepdims = True):
             print('label set failed')
             exit()
 
-    return labels
+    return np.array(labels)
 
 def color_preprocessing(x_train, x_test):
     x_train = x_train.astype('float32')
