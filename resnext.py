@@ -23,7 +23,6 @@ from keras.regularizers import l2
 from keras.utils.layer_utils import convert_all_kernels_in_model
 from keras.utils.data_utils import get_file
 from keras.engine.topology import get_source_inputs
-from keras.applications.imagenet_utils import _obtain_input_shape
 import keras.backend as K
 
 CIFAR_TH_WEIGHTS_PATH = ''
@@ -99,11 +98,11 @@ def ResNext(input_shape=None, depth=29, cardinality=8, width=64, weight_decay=5e
                              'should be divisible by 9.')
 
     # Determine proper input shape
-    input_shape = _obtain_input_shape(input_shape,
-                                      default_size=32,
-                                      min_size=8,
-                                      data_format=K.image_data_format(),
-                                      require_flatten=include_top)
+    # input_shape = _obtain_input_shape(input_shape,
+    #                                   default_size=32,
+    #                                   min_size=8,
+    #                                   data_format=K.image_data_format(),
+    #                                   require_flatten=include_top)
 
     if input_tensor is None:
         img_input = Input(shape=input_shape)
@@ -233,11 +232,11 @@ def ResNextImageNet(input_shape=None, depth=[3, 4, 6, 3], cardinality=32, width=
         raise ValueError('Depth of the network must be such that (depth - 2)'
                          'should be divisible by 9.')
     # Determine proper input shape
-    input_shape = _obtain_input_shape(input_shape,
-                                      default_size=224,
-                                      min_size=112,
-                                      data_format=K.image_data_format(),
-                                      require_flatten=include_top)
+    # input_shape = _obtain_input_shape(input_shape,
+    #                                   default_size=224,
+    #                                   min_size=112,
+    #                                   data_format=K.image_data_format(),
+    #                                   require_flatten=include_top)
 
     if input_tensor is None:
         img_input = Input(shape=input_shape)
@@ -577,6 +576,8 @@ if __name__ == '__main__':
     model = ResNext((dr.ROWS, dr.COLS, dr.CHANNELS), depth=29, cardinality=8, width=64, classes = 2)
     model.summary()
     sgd = SGD(lr=0.01, decay=1e-6, momentum=0.9, nesterov=True)
-    model.compile(loss='categorical_crossentropy', optimizer=sgd)
+    model.compile(loss='categorical_crossentropy', optimizer=sgd, metrics=['accuracy'])
     model.fit(train, train_labels, batch_size=32, epochs=10)
-    score = model.evaluate(validation, validation_labels, batch_size=32)
+    scores = model.evaluate(validation, validation_labels, batch_size=32)
+    print("%s: %.2f%%" % (model.metrics_names[1], scores[1] * 100))
+
