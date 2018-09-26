@@ -109,7 +109,6 @@ for var in var_list:
 # Add the loss to summary
 tf.summary.scalar('cross_entropy', loss)
 
-
 # Evaluation op: Accuracy of the model
 with tf.name_scope("accuracy"):
     correct_pred = tf.equal(tf.argmax(score, 1), tf.argmax(y, 1))
@@ -127,6 +126,14 @@ writer = tf.summary.FileWriter(filewriter_path)
 # Initialize an saver for store model checkpoints
 saver = tf.train.Saver()
 # Start Tensorflow session
+
+# 用于测试的变换
+crop = tf.random_crop(x, [49, 192, 192, 3])
+crop = tf.image.resize_images(crop, [256, 256])
+lr_op = tf.image.flip_left_right(x)
+ud_op = tf.image.flip_up_down(x)
+lrud_op = tf.image.transpose_image(x)
+
 with tf.Session() as sess:
 
     # Initialize all variables
@@ -167,12 +174,40 @@ with tf.Session() as sess:
 
         # Validate the model on the entire validation set
         print("{} Start validation".format(datetime.now()))
-        acc = sess.run(accuracy, feed_dict={x: validation,
+
+        # -------test———————————#
+        test_score = sess.run(score, feed_dict={x: validation,
                                             y: validation_labels,
                                                 keep_prob: 1.})
+        # crop
+        crop_batch = crop.eval(feed_dict = {x : validation})
+        test_score += sess.run(score, feed_dict={x: crop_batch,
+                                            y: validation_labels,
+                                                keep_prob: 1.})
+        # flip_lr
+        lr_op_batch = lr_op.eval(feed_dict={x: validation})
+        test_score += sess.run(score, feed_dict={x: lr_op_batch,
+                                                 y: validation_labels,
+                                                 keep_prob: 1.})
+        # flip_up
+        ud_op_batch = lr_op.eval(feed_dict={x: validation})
+        test_score += sess.run(score, feed_dict={x: ud_op_batch,
+                                                 y: validation_labels,
+                                                 keep_prob: 1.})
+
+        # flip_lrud
+        lrud_op_batch = lr_op.eval(feed_dict={x: validation})
+        test_score += sess.run(score, feed_dict={x: lrud_op_batch,
+                                                 y: validation_labels,
+                                                 keep_prob: 1.})
+
+        test_score = test_score / 5
+        test_pred = tf.equal(tf.argmax(test_score, 1), tf.argmax(y, 1))
+        test_acc = tf.reduce_mean(tf.cast(test_pred, tf.float32)).eval()
         print("{} Validation Accuracy = {:.4f}".format(datetime.now(),
-                                                       acc))
-        print("{} Saving checkpoint of model...".format(acc))
+                                                       test_acc))
+        print("{} Saving checkpoint of model...".format(test_acc))
+        # -------end———————————#
 
         # save checkpoint of the model
         checkpoint_name = os.path.join(checkpoint_path,
