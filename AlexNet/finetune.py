@@ -203,7 +203,7 @@ with tf.Session() as sess:
 
         test_score = test_score / 5
         test_pred = tf.equal(tf.argmax(test_score, 1), tf.argmax(y, 1))
-        test_acc = tf.reduce_mean(tf.cast(test_pred, tf.float32)).eval()
+        test_acc = tf.reduce_mean(tf.cast(test_pred, tf.float32)).eval(feed_dict = {y : validation_labels})
         print("{} Validation Accuracy = {:.4f}".format(datetime.now(),
                                                        test_acc))
         print("{} Saving checkpoint of model...".format(test_acc))
